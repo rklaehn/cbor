@@ -787,16 +787,11 @@ where
     }
 
     #[inline]
-    fn deserialize_newtype_struct<V>(self, name: &str, visitor: V) -> Result<V::Value>
+    fn deserialize_newtype_struct<V>(self, _name: &str, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        if name == crate::TOKEN {
-            println!("got tag!");
-            visitor.visit_newtype_struct(self)
-        } else {
-            visitor.visit_newtype_struct(self)
-        }
+        visitor.visit_newtype_struct(self)
     }
 
     // Unit variants are encoded as just the variant identifier.
@@ -958,45 +953,6 @@ where
 {
     fn error(&self, code: ErrorCode) -> Error {
         self.de.error(code)
-    }
-}
-
-struct TagAccess<'a, R> {
-    de: &'a mut Deserializer<R>,
-    tag: u64,
-    read: bool,
-}
-
-use serde::de::IntoDeserializer;
-
-impl<'de, 'a, R> de::MapAccess<'de> for TagAccess<'a, R>
-where
-    R: Read<'de>,
-{
-    type Error = Error;
-
-    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
-    where
-        K: de::DeserializeSeed<'de>,
-    {
-        if self.read {
-            return Ok(None);
-        }
-        self.read = true;
-        let deser: serde::de::value::U64Deserializer<crate::Error> = self.tag.into_deserializer();
-        let value = seed.deserialize(deser)?;
-        Ok(Some(value))
-    }
-
-    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
-    where
-        V: de::DeserializeSeed<'de>,
-    {
-        seed.deserialize(&mut *self.de)
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(1)
     }
 }
 

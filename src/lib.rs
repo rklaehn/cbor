@@ -310,10 +310,7 @@ pub use crate::ser::to_writer;
 pub use crate::value::Value;
 
 mod tagstore {
-    use super::*;
-
     use std::cell::RefCell;
-    use std::thread;
 
     thread_local!(static CBOR_TAG: RefCell<Option<u64>> = RefCell::new(None));
 
@@ -332,4 +329,3 @@ mod tagstore {
         })
     }
 }
-pub(crate) const TOKEN: &'static str = "$serde_cbor::private::Tag";
