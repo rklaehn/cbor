@@ -308,3 +308,5 @@ pub use crate::ser::to_writer;
 #[cfg(feature = "std")]
 #[doc(inline)]
 pub use crate::value::Value;
+
+pub(crate) const TOKEN: &'static str = "$serde_cbor::private::Tag";

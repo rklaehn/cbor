@@ -134,6 +134,13 @@ impl<'de> de::Deserialize<'de> for Value {
             {
                 Ok(Value::Float(v))
             }
+
+            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_any(self)
+            }
         }
 
         deserializer.deserialize_any(ValueVisitor)

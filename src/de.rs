@@ -706,19 +706,30 @@ where
             // Major type 6: optional semantic tagging of other major types
             0xc0..=0xd7 => self.recursion_checked(|de| de.parse_value(visitor)),
             0xd8 => {
-                self.parse_u8()?;
-                self.recursion_checked(|de| de.parse_value(visitor))
+                let tag = self.parse_u8()?;
+                println!("found a 1 byte tag! {}", tag);
+                self.recursion_checked(|de| {
+                    serde::de::Deserializer::deserialize_newtype_struct(de, crate::TOKEN, visitor)
+                    // visitor.visit_map(TagAccess {
+                    //     tag: tag as u64,
+                    //     de: de,
+                    //     read: false,
+                    // })
+                })
             }
             0xd9 => {
                 self.parse_u16()?;
+                println!("found a 2 byte tag!");
                 self.recursion_checked(|de| de.parse_value(visitor))
             }
             0xda => {
                 self.parse_u32()?;
+                println!("found a 4 byte tag!");
                 self.recursion_checked(|de| de.parse_value(visitor))
             }
             0xdb => {
                 self.parse_u64()?;
+                println!("found a 8 byte tag!");
                 self.recursion_checked(|de| de.parse_value(visitor))
             }
             0xdc..=0xdf => Err(self.error(ErrorCode::UnassignedCode)),
@@ -779,11 +790,16 @@ where
     }
 
     #[inline]
-    fn deserialize_newtype_struct<V>(self, _name: &str, visitor: V) -> Result<V::Value>
+    fn deserialize_newtype_struct<V>(self, name: &str, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_newtype_struct(self)
+        if name == crate::TOKEN {
+            println!("got tag!");
+            visitor.visit_newtype_struct(self)
+        } else {
+            visitor.visit_newtype_struct(self)
+        }
     }
 
     // Unit variants are encoded as just the variant identifier.
@@ -945,6 +961,45 @@ where
 {
     fn error(&self, code: ErrorCode) -> Error {
         self.de.error(code)
+    }
+}
+
+struct TagAccess<'a, R> {
+    de: &'a mut Deserializer<R>,
+    tag: u64,
+    read: bool,
+}
+
+use serde::de::IntoDeserializer;
+
+impl<'de, 'a, R> de::MapAccess<'de> for TagAccess<'a, R>
+where
+    R: Read<'de>,
+{
+    type Error = Error;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        if self.read {
+            return Ok(None);
+        }
+        self.read = true;
+        let deser: serde::de::value::U64Deserializer<crate::Error> = self.tag.into_deserializer();
+        let value = seed.deserialize(deser)?;
+        Ok(Some(value))
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(&mut *self.de)
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(1)
     }
 }
 
