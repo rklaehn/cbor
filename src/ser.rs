@@ -52,7 +52,6 @@ pub struct Serializer<W> {
     writer: W,
     packed: bool,
     enum_as_map: bool,
-    tag_mode: bool,
 }
 
 impl<W> Serializer<W>
@@ -68,7 +67,6 @@ where
             writer,
             packed: false,
             enum_as_map: true,
-            tag_mode: false,
         }
     }
 
@@ -297,12 +295,7 @@ where
 
     #[inline]
     fn serialize_u64(self, value: u64) -> Result<()> {
-        if self.tag_mode {
-            self.tag_mode = false;
-            self.write_u64(6, value)
-        } else {
-            self.write_u64(0, value)
-        }
+        self.write_u64(0, value)
     }
 
     #[inline]
@@ -407,17 +400,14 @@ where
     }
 
     #[inline]
-    fn serialize_newtype_struct<T>(self, name: &'static str, value: &T) -> Result<()>
+    fn serialize_newtype_struct<T>(self, _name: &'static str, value: &T) -> Result<()>
     where
         T: ?Sized + ser::Serialize,
     {
-        if name == crate::TOKEN {
-            println!("found it");
-            self.tag_mode = true;            
-            value.serialize(self)
-        } else {
-            value.serialize(self)
+        for tag in crate::tagstore::get_tag().into_iter() {
+            self.write_u64(6, tag)?;
         }
+        value.serialize(self)
     }
 
     #[inline]
@@ -448,11 +438,7 @@ where
 
     #[inline]
     fn serialize_tuple(self, len: usize) -> Result<&'a mut Serializer<W>> {
-        if self.tag_mode {
-            assert_eq!(len, 2);
-        } else {
-            self.write_u64(4, len as u64)?;
-        }
+        self.write_u64(4, len as u64)?;
         Ok(self)
     }
 

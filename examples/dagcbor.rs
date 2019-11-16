@@ -1,7 +1,7 @@
+use serde_cbor::Value;
 use std::error::Error;
 use std::fs::File;
 use std::io::Cursor;
-use serde_cbor::Value;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut file = File::open("examples/test.cbor")?;

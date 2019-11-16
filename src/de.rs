@@ -704,33 +704,30 @@ where
             0xbf => self.parse_indefinite_map(visitor),
 
             // Major type 6: optional semantic tagging of other major types
-            0xc0..=0xd7 => self.recursion_checked(|de| de.parse_value(visitor)),
+            0xc0..=0xd7 => {
+                let tag = byte as usize - 0xc0;
+                crate::tagstore::set_tag(Some(tag as u64));
+                self.recursion_checked(|de| visitor.visit_newtype_struct(de))
+            }
             0xd8 => {
                 let tag = self.parse_u8()?;
-                println!("found a 1 byte tag! {}", tag);
-                self.recursion_checked(|de| {
-                    serde::de::Deserializer::deserialize_newtype_struct(de, crate::TOKEN, visitor)
-                    // visitor.visit_map(TagAccess {
-                    //     tag: tag as u64,
-                    //     de: de,
-                    //     read: false,
-                    // })
-                })
+                crate::tagstore::set_tag(Some(tag as u64));
+                self.recursion_checked(|de| visitor.visit_newtype_struct(de))
             }
             0xd9 => {
-                self.parse_u16()?;
-                println!("found a 2 byte tag!");
-                self.recursion_checked(|de| de.parse_value(visitor))
+                let tag = self.parse_u16()?;
+                crate::tagstore::set_tag(Some(tag as u64));
+                self.recursion_checked(|de| visitor.visit_newtype_struct(de))
             }
             0xda => {
-                self.parse_u32()?;
-                println!("found a 4 byte tag!");
-                self.recursion_checked(|de| de.parse_value(visitor))
+                let tag = self.parse_u32()?;
+                crate::tagstore::set_tag(Some(tag as u64));
+                self.recursion_checked(|de| visitor.visit_newtype_struct(de))
             }
             0xdb => {
-                self.parse_u64()?;
-                println!("found a 8 byte tag!");
-                self.recursion_checked(|de| de.parse_value(visitor))
+                let tag = self.parse_u64()?;
+                crate::tagstore::set_tag(Some(tag as u64));
+                self.recursion_checked(|de| visitor.visit_newtype_struct(de))
             }
             0xdc..=0xdf => Err(self.error(ErrorCode::UnassignedCode)),
 

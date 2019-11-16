@@ -139,7 +139,12 @@ impl<'de> de::Deserialize<'de> for Value {
             where
                 D: serde::Deserializer<'de>,
             {
-                deserializer.deserialize_any(self)
+                let tag = crate::tagstore::get_tag();
+                let result = deserializer.deserialize_any(self);
+                result.map(|x| match tag {
+                    Some(tag) => Value::Tag(tag, Box::new(x)),
+                    None => x,
+                })
             }
         }
 
