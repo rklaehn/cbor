@@ -222,13 +222,9 @@ mod std_tests {
 
     #[test]
     fn test_self_describing() {
-        let value: error::Result<Value> =
+        let value: error::Result<String> =
             de::from_slice(&[0xd9, 0xd9, 0xf7, 0x66, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72]);
-        let expected = if cfg!(feature = "tags") {
-            Value::Tag(55799, Box::new(Value::Text("foobar".to_owned())))
-        } else {
-            Value::Text("foobar".to_owned())
-        };
+        let expected = "foobar".to_owned();
         // tag is present because tags feature is enabled
         assert_eq!(value.unwrap(), expected);
     }
