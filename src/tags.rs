@@ -42,6 +42,21 @@ impl<T: Serialize> Serialize for Tagged<T> {
     }
 }
 
+fn untagged<T>(value: T) -> Tagged<T> {
+    Tagged::new(None, value)
+}
+
+macro_rules! delegate {
+    ($name: ident, $type: ty) => {
+        fn $name<E: serde::de::Error>(self, v: $type) -> Result<Self::Value, E>
+        {
+            T::deserialize(v.into_deserializer()).map(untagged)
+        }
+    };
+}
+
+use serde::de::IntoDeserializer;
+
 impl<'de, T: serde::de::Deserialize<'de>> serde::de::Deserialize<'de> for Tagged<T> {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct ValueVisitor<T>(std::marker::PhantomData<T>);
@@ -53,9 +68,71 @@ impl<'de, T: serde::de::Deserialize<'de>> serde::de::Deserialize<'de> for Tagged
                 fmt.write_str("a cbor tag newtype")
             }
 
-            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            delegate!(visit_bool, bool);
+            
+            delegate!(visit_i8, i8);
+            delegate!(visit_i16, i16);
+            delegate!(visit_i32, i32);
+            delegate!(visit_i64, i64);
+
+            delegate!(visit_u8, u8);
+            delegate!(visit_u16, u16);
+            delegate!(visit_u32, u32);
+            delegate!(visit_u64, u64);
+            
+            delegate!(visit_f32, f32);
+            delegate!(visit_f64, f64);
+            
+            delegate!(visit_char, char);
+            delegate!(visit_str, &str);
+            delegate!(visit_borrowed_str, &'de str);
+            delegate!(visit_string, String);
+
+            // delegate!(visit_bytes, &[u8]);
+            // delegate!(visit_borrowed_bytes, &'de [u8]);
+            delegate!(visit_byte_buf, Vec<u8>);
+
+            fn visit_borrowed_bytes<E: serde::de::Error>(self, value: &'de [u8]) -> Result<Self::Value, E>
+            {
+                T::deserialize(serde::de::value::BorrowedBytesDeserializer::new(value)).map(untagged)
+            }
+
+            // fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E>
+            // {
+            //     serde::de::value::NeverDeserializer
+            //     T::deserialize(None.into_deserializer()).map(untagged)
+            // }
+
+            fn visit_some<D: serde::de::Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            {
+                T::deserialize(deserializer).map(untagged)
+            }
+
+            fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E>
+            {
+                T::deserialize(().into_deserializer()).map(untagged)
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
             where
-                D: serde::Deserializer<'de>,
+                A: serde::de::SeqAccess<'de>,
+            {
+                T::deserialize(serde::de::value::SeqAccessDeserializer::new(seq)).map(untagged)
+            }
+
+            fn visit_map<V>(self, map: V) -> Result<Self::Value, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                T::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(untagged)
+            }
+
+            // fn visit_enum<A: serde::de::EnumAccess<'de>>(self, data: A) -> Result<Self::Value, A::Error>
+            // {
+
+            // }
+
+            fn visit_newtype_struct<D: serde::Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error>
             {
                 let t = get_tag();
                 T::deserialize(deserializer).map(|v| Tagged::new(t, v))
@@ -64,14 +141,6 @@ impl<'de, T: serde::de::Deserialize<'de>> serde::de::Deserialize<'de> for Tagged
 
         deserializer.deserialize_any(ValueVisitor::<T>(std::marker::PhantomData))
     }
-}
-
-/// function to get the current cbor tag
-///
-/// The only place where it makes sense to call this function is within visit_newtype_struct of a serde visitor.
-/// This is a low level API. In most cases it is preferable to use Tagged
-pub fn current_cbor_tag() -> Option<u64> {
-    get_tag()
 }
 
 #[cfg(feature = "tags")]
